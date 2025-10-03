@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced PDF to Word Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- pdf.js for reading PDF files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <!-- docx for creating Word documents -->
+    <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .drop-zone-active {
+            border-color: #4f46e5;
+            background-color: rgba(79, 70, 229, 0.05);
+        }
+        .loader {
+            border-top-color: #4f46e5;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex items-center justify-center min-h-screen p-4">
+    <div class="w-full max-w-2xl mx-auto">
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl shadow-indigo-900/20 p-6 md:p-10">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold text-white">Advanced PDF to Word Converter</h1>
+                <p class="text-gray-400 mt-2">Convert your PDF files to editable Word (.docx) documents securely in your browser.</p>
+            </div>
+
+            <!-- File Upload Area -->
+            <div id="uploadArea" class="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center cursor-pointer hover:bg-gray-700/50 transition-colors duration-300">
+                <input type="file" id="fileInput" class="hidden" accept=".pdf">
+                <div class="flex flex-col items-center">
+                    <svg class="w-12 h-12 text-gray-500 mb-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                    <p class="text-lg font-semibold text-gray-300">Drag & drop your PDF here</p>
+                    <p class="text-gray-500 mt-1">or <span class="text-indigo-400 font-medium">browse files</span></p>
+                </div>
+            </div>
+            
+            <!-- File Info / Status Area -->
+            <div id="fileInfo" class="hidden mt-6 text-center">
+                <div class="bg-gray-700/50 p-4 rounded-lg flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 text-red-400"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
+                        <div>
+                            <p id="fileName" class="font-medium text-white truncate"></p>
+                            <p id="fileSize" class="text-sm text-gray-400"></p>
+                        </div>
+                    </div>
+                    <button id="removeFile" class="text-gray-500 hover:text-white transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Convert Button -->
+            <div id="convertButtonContainer" class="mt-6 text-center">
+                <button id="convertBtn" class="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/50 transition-all duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed transform hover:scale-105" disabled>
+                    Convert to Word
+                </button>
+            </div>
+            
+            <!-- Progress / Download Area -->
+            <div id="statusArea" class="hidden mt-6">
+                <div id="progressIndicator" class="hidden items-center justify-center flex-col text-center">
+                     <div class="loader w-12 h-12 rounded-full border-4 border-gray-700"></div>
+                     <p id="statusText" class="mt-4 text-lg font-medium text-gray-300">Processing your PDF...</p>
+                     <p class="text-sm text-gray-500">This may take a moment for large files.</p>
+                </div>
+                <div id="downloadArea" class="hidden text-center">
+                    <p class="text-xl font-semibold text-green-400 mb-4">Conversion Successful!</p>
+                    <a id="downloadLink" class="w-full inline-block bg-green-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-500/50 transition-all duration-300 transform hover:scale-105">
+                        Download .docx
+                    </a>
+                </div>
+            </div>
+            
+             <!-- Error Message -->
+            <div id="errorArea" class="hidden mt-4 bg-red-900/50 border border-red-500/50 text-red-300 px-4 py-3 rounded-lg" role="alert">
+                <p id="errorMessage"></p>
+            </div>
+            
+             <!-- Disclaimer -->
+            <div class="text-center mt-8">
+                <p class="text-xs text-gray-500">
+                    This tool performs text extraction from PDF to Word. Complex formatting, tables, and images may not be preserved perfectly. All processing is done in your browser; your files are not uploaded to any server.
+                </p>
+            </div>
+        </div>
+
+        <footer class="text-center mt-6">
+            <p class="text-sm text-gray-600">Created by Gemini</p>
+        </footer>
+    </div>
+
+    <script>
+        // Set workerSrc for pdf.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileNameEl = document.getElementById('fileName');
+        const fileSizeEl = document.getElementById('fileSize');
+        const removeFileBtn = document.getElementById('removeFile');
+        const convertBtn = document.getElementById('convertBtn');
+        const statusArea = document.getElementById('statusArea');
+        const progressIndicator = document.getElementById('progressIndicator');
+        const statusText = document.getElementById('statusText');
+        const downloadArea = document.getElementById('downloadArea');
+        const downloadLink = document.getElementById('downloadLink');
+        const errorArea = document.getElementById('errorArea');
+        const errorMessage = document.getElementById('errorMessage');
+        const convertButtonContainer = document.getElementById('convertButtonContainer');
+
+        let currentFile = null;
+
+        // --- Event Listeners ---
+        uploadArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0]));
+        removeFileBtn.addEventListener('click', resetState);
+
+        // Drag and drop events
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => uploadArea.classList.add('drop-zone-active'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('drop-zone-active'), false);
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const file = dt.files[0];
+            if (file && file.type === 'application/pdf') {
+                handleFileSelect(file);
+            } else {
+                showError('Please drop a valid PDF file.');
+            }
+        }, false);
+        
+        convertBtn.addEventListener('click', handleConversion);
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorArea.classList.remove('hidden');
+            setTimeout(() => {
+                errorArea.classList.add('hidden');
+            }, 5000);
+        }
+
+        function handleFileSelect(file) {
+            if (!file) return;
+
+            if (file.type !== 'application/pdf') {
+                showError("Invalid file type. Please select a PDF file.");
+                return;
+            }
+            
+            resetState(); // Reset if a new file is selected
+            currentFile = file;
+
+            fileNameEl.textContent = file.name;
+            fileSizeEl.textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+
+            uploadArea.classList.add('hidden');
+            fileInfo.classList.remove('hidden');
+            convertBtn.disabled = false;
+        }
+
+        function resetState() {
+            currentFile = null;
+            fileInput.value = ''; // Reset file input
+            
+            uploadArea.classList.remove('hidden');
+            fileInfo.classList.add('hidden');
+            convertBtn.disabled = true;
+            statusArea.classList.add('hidden');
+            progressIndicator.classList.add('hidden');
+            downloadArea.classList.add('hidden');
+            errorArea.classList.add('hidden');
+            if (downloadLink.href) {
+                 URL.revokeObjectURL(downloadLink.href); // Clean up old blob URLs
+            }
+        }
+        
+        async function handleConversion() {
+            if (!currentFile) return;
+            
+            hidePreviousResults();
+            statusArea.classList.remove('hidden');
+            progressIndicator.style.display = 'flex'; // Use style.display for flex
+            convertButtonContainer.classList.add('hidden');
+            fileInfo.classList.add('hidden');
+
+
+            try {
+                statusText.textContent = "Reading PDF file...";
+                const fileReader = new FileReader();
+                fileReader.readAsArrayBuffer(currentFile);
+
+                fileReader.onload = async (event) => {
+                    try {
+                        const pdfData = new Uint8Array(event.target.result);
+                        const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                        
+                        const paragraphs = [];
+                        
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            statusText.textContent = `Processing page ${i} of ${pdf.numPages}...`;
+                            const page = await pdf.getPage(i);
+                            const textContent = await page.getTextContent();
+                            
+                            // Simple text extraction. A more advanced version would handle styles, positions, etc.
+                            const pageText = textContent.items.map(item => item.str).join(' ');
+                            paragraphs.push(new docx.Paragraph({ text: pageText }));
+                        }
+                        
+                        statusText.textContent = "Generating Word document...";
+
+                        const doc = new docx.Document({
+                            sections: [{
+                                properties: {},
+                                children: paragraphs,
+                            }],
+                        });
+
+                        const blob = await docx.Packer.toBlob(doc);
+                        
+                        const downloadUrl = URL.createObjectURL(blob);
+                        downloadLink.href = downloadUrl;
+                        downloadLink.download = `${currentFile.name.replace('.pdf', '')}.docx`;
+                        
+                        progressIndicator.style.display = 'none';
+                        downloadArea.classList.remove('hidden');
+
+                    } catch (err) {
+                        console.error("Error during PDF processing:", err);
+                        showError('Failed to process the PDF file. It might be corrupted or protected.');
+                        resetState();
+                    }
+                };
+                
+                fileReader.onerror = () => {
+                    showError("Failed to read the file.");
+                    resetState();
+                };
+
+            } catch (err) {
+                 console.error("Error during conversion:", err);
+                 showError("An unexpected error occurred during conversion.");
+                 resetState();
+            }
+        }
+
+        function hidePreviousResults() {
+             downloadArea.classList.add('hidden');
+             errorArea.classList.add('hidden');
+             if (downloadLink.href) {
+                 URL.revokeObjectURL(downloadLink.href);
+             }
+        }
+
+    </script>
+</body>
+</html>
